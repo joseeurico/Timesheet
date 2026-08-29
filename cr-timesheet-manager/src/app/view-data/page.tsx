@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { deleteCrAction } from "@/app/actions";
+import { DeleteCrButton } from "@/components/delete-cr-button";
 import { prisma } from "@/lib/prisma";
 
 function formatStatus(status: string) {
@@ -119,21 +120,7 @@ export default async function ViewDataPage({
                         >
                           Edit
                         </Link>
-                        <form action={deleteCrAction}>
-                          <input type="hidden" name="id" value={recordId} />
-                          <button
-                            type="submit"
-                            className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100"
-                            onClick={(event) => {
-                              const confirmed = window.confirm("Delete this CR record permanently?");
-                              if (!confirmed) {
-                                event.preventDefault();
-                              }
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </form>
+                        <DeleteCrButton id={recordId} action={deleteCrAction} />
                       </div>
                     </td>
                   </tr>

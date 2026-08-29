@@ -3,6 +3,34 @@ import { format } from "date-fns";
 
 import { prisma } from "@/lib/prisma";
 
+function parseSelectedCrNumbers(value: string | null | undefined): string[] {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item).trim()).filter(Boolean);
+    }
+    if (typeof parsed === "string") {
+      return parsed
+        .split(/[\r\n,]+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  } catch {
+    // Legacy data may be stored as a plain comma-separated list.
+  }
+
+  return raw
+    .split(/[\r\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export default async function HistoryPage() {
   const histories = await prisma.generationHistory.findMany({
     orderBy: { generatedAt: "desc" },
@@ -22,7 +50,7 @@ export default async function HistoryPage() {
           const periodStart = String(history.periodStart ?? "N/A");
           const periodEnd = String(history.periodEnd ?? "N/A");
           const generatedAt = history.generatedAt instanceof Date ? history.generatedAt : new Date(String(history.generatedAt ?? ""));
-          const selectedCrNumbers = JSON.parse(String(history.selectedCrNumbers ?? "[]")) as string[];
+          const selectedCrNumbers = parseSelectedCrNumbers(history.selectedCrNumbers ?? undefined);
 
           return (
             <div key={historyId} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

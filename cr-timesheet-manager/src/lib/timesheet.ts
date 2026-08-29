@@ -40,7 +40,8 @@ export function parseCrList(raw: string): { values: string[]; missing: string[] 
 }
 
 export function joinWithAmpersand(values: string[]): string {
-  return values.filter((value) => value && value.trim()).map((value) => value.trim()).join(" & ");
+  const cleanedValues = values.filter((value) => value && value.trim()).map((value) => value.trim());
+  return cleanedValues.join(cleanedValues.length > 2 ? " || " : " & ");
 }
 
 function getProjectCodeValue(record: CrRecordLike, mode: TimesheetMode): string {
@@ -59,17 +60,24 @@ function getProjectNameValue(record: CrRecordLike, mode: TimesheetMode): string 
   return record.aipFitur;
 }
 
-export function buildTimesheetOutput(records: CrRecordLike[], mode: TimesheetMode) {
+export function buildTimesheetOutput(records: CrRecordLike[], mode: TimesheetMode, date?: string) {
   const activity = joinWithAmpersand(records.map((record) => record.projectName));
   const projectName = joinWithAmpersand(records.map((record) => getProjectNameValue(record, mode)));
   const projectCode = joinWithAmpersand(records.map((record) => getProjectCodeValue(record, mode)));
+  const headers = date
+    ? ["Date", "Activity / Remarks", "Project Name", "Project Code"]
+    : ["Activity / Remarks", "Project Name", "Project Code"];
+  const row = date
+    ? { Date: date, "Activity / Remarks": activity, "Project Name": projectName, "Project Code": projectCode }
+    : { "Activity / Remarks": activity, "Project Name": projectName, "Project Code": projectCode };
+  const values = date ? [date, activity, projectName, projectCode] : [activity, projectName, projectCode];
 
   return {
-    headers: ["Activity / Remarks", "Project Name", "Project Code"],
-    rows: [{ "Activity / Remarks": activity, "Project Name": projectName, "Project Code": projectCode }],
+    headers,
+    rows: [row],
     tsv: [
-      ["Activity / Remarks", "Project Name", "Project Code"],
-      [activity, projectName, projectCode],
+      headers,
+      values,
     ]
       .map((row) => row.join("\t"))
       .join("\n"),

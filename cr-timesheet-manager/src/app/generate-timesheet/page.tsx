@@ -1,12 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+function getDates(start: string, end: string): string[] {
+  if (!start || !end) {
+    return [];
+  }
+
+  const dates: string[] = [];
+  const current = new Date(`${start}T00:00:00`);
+  const last = new Date(`${end}T00:00:00`);
+
+  while (current <= last) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+}
 
 export default function GenerateTimesheetPage() {
   const [periodType, setPeriodType] = useState("day");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [crInput, setCrInput] = useState("10001\n20031");
+  const [dailyCrInputs, setDailyCrInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<null | {
     selectedNumbers: string[];
@@ -15,6 +33,18 @@ export default function GenerateTimesheetPage() {
     outputVersion2: { headers: string[]; rows: Record<string, string>[]; tsv: string };
   }>(null);
   const [notice, setNotice] = useState("");
+  const isDailyPeriod = periodType !== "day";
+  const dailyDates = isDailyPeriod ? getDates(periodStart, periodEnd) : [];
+
+  useEffect(() => {
+    setDailyCrInputs((current) => {
+      const next: Record<string, string> = {};
+      dailyDates.forEach((date) => {
+        next[date] = current[date] ?? "";
+      });
+      return next;
+    });
+  }, [periodStart, periodEnd, periodType]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -27,11 +57,20 @@ export default function GenerateTimesheetPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
+          body: JSON.stringify({
           periodType,
           periodStart,
           periodEnd,
-          crNumbers: crInput,
+            crNumbers: isDailyPeriod ? undefined : crInput,
+            dailyEntries: isDailyPeriod
+              ? dailyDates.map((date) => ({
+                  date,
+                  crNumbers: (dailyCrInputs[date] ?? "")
+                    .split(/[,\s]+/)
+                    .map((value) => value.trim())
+                    .filter(Boolean),
+                }))
+              : undefined,
         }),
       });
 
@@ -105,15 +144,40 @@ export default function GenerateTimesheetPage() {
               </label>
             )}
 
-            <label className="block text-sm font-medium text-slate-700">
-              CR numbers
-              <textarea
-                value={crInput}
-                onChange={(event) => setCrInput(event.target.value)}
-                className="mt-1 min-h-[180px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-sky-500"
-                placeholder="10001\n20031\n30012"
-              />
-            </label>
+            {!isDailyPeriod ? (
+              <label className="block text-sm font-medium text-slate-700">
+                CR numbers
+                <textarea
+                  value={crInput}
+                  onChange={(event) => setCrInput(event.target.value)}
+                  className="mt-1 min-h-[180px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-sky-500"
+                  placeholder="10001\n20031\n30012"
+                />
+              </label>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-sm font-medium text-slate-700">Daily CR numbers</div>
+                {dailyDates.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
+                    Select a valid start and end date to enter daily CR numbers.
+                  </div>
+                ) : (
+                  dailyDates.map((date) => (
+                    <label key={date} className="block text-sm font-medium text-slate-700">
+                      {date}
+                      <input
+                        type="text"
+                        value={dailyCrInputs[date] ?? ""}
+                        onChange={(event) => setDailyCrInputs((current) => ({ ...current, [date]: event.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-sky-500"
+                        placeholder="CR number(s), e.g. 10001, 20031"
+                      />
+                    </label>
+                  ))
+                )}
+                <p className="text-xs font-normal text-slate-500">Enter at least one CR for every date.</p>
+              </div>
+            )}
 
             <button
               type="submit"
